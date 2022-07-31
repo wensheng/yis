@@ -57,5 +57,5 @@ $ curl -s http://localhost:8888/items/123\?q\=hello |jq
 
 ## Environments
 
-Core i7-7700k, Ubuntu 20.04 under Windows WSL2
+Core i7-7700k, Ubuntu 20.04 under Windows WSL2, Python 3.10.5
 

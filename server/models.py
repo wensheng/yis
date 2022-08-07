@@ -1,6 +1,9 @@
-from database import Base
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import backref, relationship
+
+
+Base = declarative_base()
 
 
 class Department(Base):

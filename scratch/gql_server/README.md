@@ -1,8 +1,19 @@
 # A barely working GraphQL Tornado SqlAlchemy server
 
-Initialize sqlite database: `python init_db.py`
+Set up venv.
 
-run: `python gql_server.py`
+    python3 -m venv venv
+    ./venv/bin/pip install pip wheel -U
+    ./venv/bin/pip install -r requirements.txt
+
+Create and initialize Sqlite database.
+
+    ./venv/bin/python init_db.py
+
+Start server:
+
+    ./venv/bin/python main.py
+
 
 Open in browser: localhost:5000/graphql
 
@@ -30,4 +41,4 @@ Example query:
 
 ## graphene-tornado
 
-Abandonware?: https://github.com/graphql-python/graphene-tornado  (last update 2 yrs ago, last release 4 yrs ago)
+graphene_tornado is from: https://github.com/graphql-python/graphene-tornado.git

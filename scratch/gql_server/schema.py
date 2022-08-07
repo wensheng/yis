@@ -1,13 +1,13 @@
 from typing import Optional
+from models import Department as DepartmentModel
+from models import Employee as EmployeeModel
+from models import Role as RoleModel
 
 import graphene
 from graphene import relay
 from graphene_sqlalchemy import SQLAlchemyConnectionField, SQLAlchemyObjectType
 from graphql.type.definition import GraphQLResolveInfo
-
-from models import Department as DepartmentModel
-from models import Employee as EmployeeModel
-from models import Role as RoleModel
+from tornado.escape import to_unicode
 
 
 class Department(SQLAlchemyObjectType):
@@ -42,7 +42,7 @@ class QueryRoot(graphene.ObjectType):
 
 
     def resolve_request(self, info: GraphQLResolveInfo) -> str:
-        return info.context.arguments["q"][0]
+        return to_unicode(info.context.arguments["q"][0])
 
     def resolve_test(self, info: GraphQLResolveInfo, who: Optional[str] = None) -> str:
         return "Hello %s" % (who or "World")

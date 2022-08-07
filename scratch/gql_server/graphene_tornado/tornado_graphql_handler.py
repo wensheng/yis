@@ -32,8 +32,6 @@ from typing_extensions import Awaitable
 from werkzeug.datastructures import MIMEAccept
 from werkzeug.http import parse_accept_header
 
-from graphene_tornado.extension_stack import GraphQLExtensionStack
-from graphene_tornado.graphql_extension import GraphQLExtension
 from graphene_tornado.render_graphiql import render_graphiql
 
 
@@ -61,7 +59,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
     document: Optional[DocumentNode]
     graphql_params: Optional[Tuple[Any, Any, Any, Any]] = None
     parsed_body: Optional[Dict[str, Any]] = None
-    extension_stack = GraphQLExtensionStack([])
     request_context: Dict[str, Any] = {}
 
     def initialize(
@@ -72,18 +69,12 @@ class TornadoGraphQLHandler(web.RequestHandler):
         graphiql: bool = False,
         pretty: bool = False,
         batch: bool = False,
-        extensions: List[
-            Union[Callable[[], GraphQLExtension], GraphQLExtension]
-        ] = None,
     ) -> None:
         super(TornadoGraphQLHandler, self).initialize()
 
         self.schema = schema
 
         middlewares = []
-        if extensions:
-            self.extension_stack = GraphQLExtensionStack(extensions)
-            middlewares.extend([self.extension_stack.as_middleware()])
 
         if middleware is not None:
             middlewares.extend(list(self.instantiate_middleware(middleware)))
@@ -126,10 +117,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
 
     async def run(self, method: str) -> None:
         show_graphiql = self.graphiql and self.should_display_graphiql()
-
-        if show_graphiql:
-            # We want to disable extensions when serving GraphiQL
-            self.extension_stack.extensions = []
 
         data = self.parse_body()
 
@@ -212,56 +199,42 @@ class TornadoGraphQLHandler(web.RequestHandler):
             self.request, data
         )
 
-        request_end = await self.extension_stack.request_started(
-            self.request,
-            query,
-            None,
-            operation_name,
-            variables,
-            self.context,
-            self.request_context,
+        execution_result, invalid = await self.execute_graphql_request(
+            method, query, variables, operation_name, show_graphiql
         )
 
-        try:
-            execution_result, invalid = await self.execute_graphql_request(
-                method, query, variables, operation_name, show_graphiql
-            )
+        status_code = 200
+        if execution_result:
+            response = {}
 
-            status_code = 200
-            if execution_result:
-                response = {}
+            if is_awaitable(execution_result) or iscoroutinefunction(
+                execution_result
+            ):
+                execution_result = await execution_result
 
-                if is_awaitable(execution_result) or iscoroutinefunction(
-                    execution_result
-                ):
-                    execution_result = await execution_result
+            if hasattr(execution_result, "get"):
+                execution_result = execution_result.get()
 
-                if hasattr(execution_result, "get"):
-                    execution_result = execution_result.get()
+            if execution_result.errors:
+                response["errors"] = [
+                    self.format_error(e) for e in execution_result.errors
+                ]
 
-                if execution_result.errors:
-                    response["errors"] = [
-                        self.format_error(e) for e in execution_result.errors
-                    ]
-
-                if invalid:
-                    status_code = 400
-                else:
-                    response["data"] = execution_result.data
-
-                if self.batch:
-                    response["id"] = id
-                    response["status"] = status_code
-
-                result = self.json_encode(response, pretty=self.pretty or show_graphiql)
+            if invalid:
+                status_code = 400
             else:
-                result = None
+                response["data"] = execution_result.data
 
-            res = (result, status_code)
-            await self.extension_stack.will_send_response(result, self.context)
-            return res
-        finally:
-            await request_end()
+            if self.batch:
+                response["id"] = id
+                response["status"] = status_code
+
+            result = self.json_encode(response, pretty=self.pretty or show_graphiql)
+        else:
+            result = None
+
+        res = (result, status_code)
+        return res
 
     async def execute_graphql_request(
         self,
@@ -278,26 +251,18 @@ class TornadoGraphQLHandler(web.RequestHandler):
                 return None, None
             raise HTTPError(400, "Must provide query string.")
 
-        parsing_ended = await self.extension_stack.parsing_started(query)
         try:
             self.document = parse(query)
-            await parsing_ended()
         except GraphQLError as e:
-            await parsing_ended(e)
             return ExecutionResult(errors=[e], data=None), True
 
-        validation_ended = await self.extension_stack.validation_started()
         try:
             validation_errors = validate(self.schema.graphql_schema, self.document)
         except GraphQLError as e:
-            await validation_ended([e])
             return ExecutionResult(errors=[e], data=None), True
 
         if validation_errors:
-            await validation_ended(validation_errors)
             return ExecutionResult(errors=validation_errors, data=None,), True
-        else:
-            await validation_ended()
 
         if method.lower() == "get":
             operation_node = get_operation_ast(self.document, operation_name)
@@ -319,15 +284,6 @@ class TornadoGraphQLHandler(web.RequestHandler):
                     ),
                 )
 
-        execution_ended = await self.extension_stack.execution_started(
-            schema=self.schema.graphql_schema,
-            document=self.document,
-            root=self.root_value,
-            context=self.context,
-            variables=variables,
-            operation_name=operation_name,
-            request_context=self.request_context,
-        )
         try:
             result = await self.execute(
                 self.document,
@@ -337,9 +293,7 @@ class TornadoGraphQLHandler(web.RequestHandler):
                 context_value=self.context,
                 middleware=self.get_middleware(),
             )
-            await execution_ended()
         except GraphQLError as e:
-            await execution_ended([e])
             return ExecutionResult(errors=[e], data=None), True
 
         return result, False

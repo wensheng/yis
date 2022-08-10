@@ -1,0 +1,10 @@
+tornado==6.2.0
+sqlalchemy[asyncio]==1.4.39
+asyncpg==0.26.0
+graphene==3.1
+jinja2==3.1.2
+graphql-core==3.2.1
+graphene-sqlalchemy==3.0.0b2
+typing_extensions==4.3.0
+werkzeug==2.2.1
+pytest==7.1.2

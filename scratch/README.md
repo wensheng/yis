@@ -11,3 +11,11 @@ See: [Evaluate Fastapi vs Tornado](evaluate_fastapi_vs_tornado.md)
 Decision: yes.  Rationale: already... might as well...
 
 Schema-first(Ariadne) vs code-first(Graphene): code-first coz less effort, easy to expand, more github stars.
+
+On the 2nd thought, no.
+
+## deps
+
+On Ubuntu:
+
+    sudo apt install liblzma-dev libsqlite3-dev libreadline-dev libbz2-dev
